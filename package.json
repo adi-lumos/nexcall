@@ -1,5 +1,5 @@
 {
-  "name": "nexcall",
+  "name": "adiconnect",
   "version": "1.0.0",
   "description": "Self-hosted private 1-on-1 WebRTC video/audio PWA",
   "main": "server.js",

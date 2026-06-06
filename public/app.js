@@ -4,8 +4,8 @@ import { openDB } from './db.js';
 
 // ── ICE / TURN config ─────────────────────────────
 const TURN_HOST = location.hostname;
-const TURN_USERNAME = 'nexcall';
-const TURN_CREDENTIAL = 'nexcall-pass';
+const TURN_USERNAME = 'adiconnect';
+const TURN_CREDENTIAL = 'adiconnect-pass';
 
 const ICE_SERVERS = [
   { urls: `stun:${TURN_HOST}:3478` },
@@ -278,4 +278,4 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(console.warn);
 }
 
-console.log('[NexCall] loaded');
+console.log('[adiconnect] loaded');

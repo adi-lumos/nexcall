@@ -1,6 +1,6 @@
 {
-  "name": "NexCall – Private Video Calls",
-  "short_name": "NexCall",
+  "name": "adiconnect",
+  "short_name": "adiconnect",
   "description": "Self-hosted peer-to-peer encrypted 1-on-1 video calls. No accounts. No cloud.",
   "start_url": "/",
   "scope": "/",

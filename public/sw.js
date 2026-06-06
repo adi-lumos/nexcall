@@ -1,5 +1,5 @@
 'use strict';
-const CACHE_VER    = 'nexcall-v2';
+const CACHE_VER    = 'adiconnect-v3';
 const CACHE_STATIC = `${CACHE_VER}-static`;
 const SHELL = [
   '/', '/index.html', '/app.js', '/db.js', '/manifest.json',

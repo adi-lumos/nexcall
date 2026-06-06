@@ -103,5 +103,5 @@ const heartbeat = setInterval(() => {
 wss.on('close', () => clearInterval(heartbeat));
 
 httpServer.listen(PORT, () =>
-  console.log(`[NexCall] Signaling server running on http://localhost:${PORT}`)
+  console.log(`[adiconnect] Signaling server running on http://localhost:${PORT}`)
 );
