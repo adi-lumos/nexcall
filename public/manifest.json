@@ -1,0 +1,20 @@
+{
+  "name": "NexCall – Private Video Calls",
+  "short_name": "NexCall",
+  "description": "Self-hosted peer-to-peer encrypted 1-on-1 video calls. No accounts. No cloud.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "lang": "en",
+  "categories": ["communication"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon.svg",     "sizes": "any",      "type": "image/svg+xml" }
+  ],
+  "prefer_related_applications": false
+}
+

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="theme-color" content="#0a0a0f"/>
+  <meta name="description" content="Private 1-on-1 encrypted video calling — self-hosted"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="NexCall"/>
+  <title>NexCall – Private Video Calls</title>
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg"/>
+  <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
+  <style>
+    :root {
+      --bg:#0a0a0f; --surface:#12121a; --surface-2:#1c1c28; --border:rgba(255,255,255,0.07);
+      --accent:#00e5a0; --accent-dim:rgba(0,229,160,0.15); --accent-glow:rgba(0,229,160,0.30);
+      --danger:#ff4d6d; --danger-dim:rgba(255,77,109,0.15);
+      --text:#e8e8f0; --text-muted:#7070a0; --text-faint:#3a3a55;
+      --r:16px; --r-sm:8px; 
+      --font-ui:system-ui,sans-serif; --font-mono:ui-monospace,monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-ui);-webkit-font-smoothing:antialiased;overflow:hidden}
+    body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+      background:radial-gradient(ellipse 60% 50% at 10% 20%,rgba(0,229,160,.06) 0%,transparent 70%),
+                 radial-gradient(ellipse 50% 40% at 90% 80%,rgba(120,80,255,.07) 0%,transparent 70%)}
+    #app{position:relative;z-index:1;height:100%;display:flex;flex-direction:column}
+    .screen{display:none;flex-direction:column;flex:1;height:100%}
+    .screen.active{display:flex}
+    #lobby-screen{align-items:center;justify-content:center;padding:24px}
+    .lobby-header{text-align:center;margin-bottom:40px}
+    .logo-mark{display:inline-flex;align-items:center;justify-content:center;width:72px;height:72px;border-radius:20px;background:var(--accent-dim);border:1px solid rgba(0,229,160,.25);margin-bottom:20px;position:relative}
+    .logo-mark svg{width:36px;height:36px;color:var(--accent)}
+    .logo-pulse{position:absolute;inset:-4px;border-radius:24px;border:1px solid var(--accent);opacity:0;animation:pulse-ring 3s ease-out infinite}
+    @keyframes pulse-ring{0%{transform:scale(1);opacity:.5}100%{transform:scale(1.35);opacity:0}}
+    .lobby-title{font-size:clamp(2rem,6vw,3rem);font-weight:800;letter-spacing:-.03em;color:#fff}
+    .lobby-sub{margin-top:8px;font-size:.9rem;color:var(--text-muted)}
+    .card{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:32px;display:flex;flex-direction:column;gap:16px}
+    .field-label{font-size:.7rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px}
+    .field-group{display:flex;flex-direction:column}
+    .text-input{width:100%;padding:12px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-family:var(--font-mono);font-size:1rem;letter-spacing:.05em;outline:none;transition:border-color .2s,box-shadow .2s}
+    .text-input::placeholder{color:var(--text-faint)}
+    .text-input:focus{border-color:rgba(0,229,160,.4);box-shadow:0 0 0 3px rgba(0,229,160,.1)}
+    .btn-row{display:flex;gap:10px;margin-top:4px}
+    .btn{flex:1;padding:13px 20px;border-radius:var(--r-sm);border:none;font-family:var(--font-ui);font-size:.9rem;font-weight:700;letter-spacing:.02em;cursor:pointer;transition:transform .15s,box-shadow .15s,opacity .15s}
+    .btn:active{transform:scale(.97)}.btn:disabled{opacity:.4;cursor:not-allowed}
+    .btn-primary{background:var(--accent);color:#000;box-shadow:0 0 18px var(--accent-glow)}
+    .btn-primary:hover:not(:disabled){box-shadow:0 0 28px var(--accent-glow)}
+    .btn-secondary{background:var(--surface-2);color:var(--text);border:1px solid var(--border)}
+    .btn-secondary:hover:not(:disabled){border-color:rgba(255,255,255,.15)}
+    .divider{display:flex;align-items:center;gap:12px;color:var(--text-faint);font-size:.75rem}
+    .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+    #status-msg{font-size:.8rem;font-family:var(--font-mono);color:var(--text-muted);text-align:center;min-height:18px;transition:color .3s}
+    #status-msg.error{color:var(--danger)}#status-msg.success{color:var(--accent)}
+    #call-screen{position:relative;background:#000;overflow:hidden}
+    #remote-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    #remote-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--text-muted);font-size:.9rem;z-index:1;pointer-events:none}
+    .spinner{width:40px;height:40px;border:3px solid var(--surface-2);border-top-color:var(--accent);border-radius:50%;animation:spin .9s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    #local-video-wrapper{position:absolute;bottom:100px;right:16px;width:clamp(100px,25vw,160px);aspect-ratio:3/4;border-radius:12px;overflow:hidden;border:2px solid rgba(255,255,255,.15);box-shadow:0 8px 32px rgba(0,0,0,.6);z-index:10;cursor:grab}
+    #local-video-wrapper:active{cursor:grabbing}
+    #local-video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);background:var(--surface)}
+    #call-header{position:absolute;top:0;left:0;right:0;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;z-index:10;background:linear-gradient(to bottom,rgba(0,0,0,.7) 0%,transparent 100%)}
+    .call-room-id{font-family:var(--font-mono);font-size:.75rem;color:rgba(255,255,255,.5);background:rgba(0,0,0,.4);padding:4px 10px;border-radius:20px;border:1px solid rgba(255,255,255,.1)}
+    #call-timer{font-family:var(--font-mono);font-size:.85rem;color:rgba(255,255,255,.6)}
+    #controls{position:absolute;bottom:0;left:0;right:0;padding:20px 24px 36px;display:flex;align-items:center;justify-content:center;gap:16px;z-index:10;background:linear-gradient(to top,rgba(0,0,0,.8) 0%,transparent 100%)}
+    .ctrl-btn{width:56px;height:56px;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:transform .15s}
+    .ctrl-btn:active{transform:scale(.92)}.ctrl-btn svg{width:22px;height:22px;pointer-events:none}
+    .muted-label{position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:.6rem;color:var(--danger);font-weight:700;letter-spacing:.08em;white-space:nowrap;opacity:0;transition:opacity .2s}
+    .ctrl-btn.muted .muted-label{opacity:1}
+    #btn-mic,#btn-cam{background:rgba(255,255,255,.12);color:#fff;backdrop-filter:blur(8px)}
+    #btn-mic.muted,#btn-cam.muted{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(255,77,109,.3)}
+    #btn-hangup{width:64px;height:64px;background:var(--danger);color:#fff;box-shadow:0 4px 24px rgba(255,77,109,.45)}
+    #toast-container{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:1000;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+    .toast{background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:999px;font-size:.8rem;font-family:var(--font-mono);white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.4);animation:t-in .3s ease,t-out .3s ease 2.7s forwards}
+    .toast.info{border-color:rgba(0,229,160,.3);color:var(--accent)}.toast.warning{border-color:rgba(255,200,50,.3);color:#ffc832}.toast.error{border-color:rgba(255,77,109,.3);color:var(--danger)}
+    @keyframes t-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes t-out{to{opacity:0;transform:translateY(-8px)}}
+    #permission-overlay{display:none;position:fixed;inset:0;background:rgba(10,10,15,.93);backdrop-filter:blur(12px);z-index:500;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:20px;text-align:center}
+    #permission-overlay.visible{display:flex}
+    .perm-icon{width:64px;height:64px;border-radius:50%;background:var(--danger-dim);border:1px solid rgba(255,77,109,.3);display:flex;align-items:center;justify-content:center;color:var(--danger)}
+    .perm-icon svg{width:28px;height:28px}
+    .perm-title{font-size:1.3rem;font-weight:700;color:#fff}.perm-body{font-size:.9rem;color:var(--text-muted);max-width:280px;line-height:1.6}
+  </style>
+</head>
+<body>
+<div id="toast-container" role="status" aria-live="polite"></div>
+<div id="permission-overlay" role="dialog" aria-modal="true">
+  <div class="perm-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 2l7 4v5c0 5.25-3.5 10.15-7 11.5C8.5 21.15 5 16.25 5 11V6l7-4z"/>
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01"/>
+    </svg>
+  </div>
+  <p class="perm-title">Camera &amp; Mic Blocked</p>
+  <p class="perm-body">Allow camera and microphone access in your browser's address bar, then reload.</p>
+  <button class="btn btn-primary" style="max-width:220px" onclick="location.reload()">Reload Page</button>
+</div>
+<div id="app">
+  <section id="lobby-screen" class="screen active" aria-label="Join a call">
+    <header class="lobby-header">
+      <div class="logo-mark">
+        <div class="logo-pulse"></div>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+        </svg>
+      </div>
+      <h1 class="lobby-title">NexCall</h1>
+      <p class="lobby-sub">End-to-end encrypted · Peer-to-peer · Your server only</p>
+    </header>
+    <div class="card">
+      <div class="field-group">
+        <label for="room-input" class="field-label">Room ID</label>
+        <input id="room-input" class="text-input" type="text" placeholder="enter-room-name"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" maxlength="40"/>
+      </div>
+      <div class="btn-row">
+        <button id="btn-create" class="btn btn-primary">Create Room</button>
+        <button id="btn-join"   class="btn btn-secondary">Join Room</button>
+      </div>
+      <div class="divider">or</div>
+      <button id="btn-random" class="btn btn-secondary" style="width:100%">Generate Random Room</button>
+      <p id="status-msg" aria-live="polite"></p>
+    </div>
+  </section>
+  <section id="call-screen" class="screen" aria-label="Active call">
+    <video id="remote-video" autoplay playsinline></video>
+    <div id="remote-placeholder">
+      <div class="spinner"></div>
+      <span>Waiting for peer to connect…</span>
+    </div>
+    <div id="call-header">
+      <span id="call-room-label" class="call-room-id"></span>
+      <span id="call-timer">00:00</span>
+    </div>
+    <div id="local-video-wrapper" title="Drag to reposition">
+      <video id="local-video" autoplay playsinline muted></video>
+    </div>
+    <div id="controls" role="toolbar">
+      <button id="btn-mic" class="ctrl-btn" aria-label="Mute microphone" aria-pressed="false">
+        <span class="muted-label">MUTED</span>
+        <svg id="icon-mic-on" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 1a4 4 0 014 4v7a4 4 0 01-8 0V5a4 4 0 014-4zM8 15a4 4 0 008 0M12 19v3M8 22h8"/>
+        </svg>
+        <svg id="icon-mic-off" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="display:none">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 14a5 5 0 01-9.9 1M9 9l6 6M15 5a3 3 0 00-6 0v4m0 0L3 3m18 18L9 9"/>
+        </svg>
+      </button>
+      <button id="btn-hangup" class="ctrl-btn" aria-label="End call">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.5A2.5 2.5 0 015.5 3h.5a1 1 0 011 1v3a1 1 0 01-.293.707L5.5 8.914A11.066 11.066 0 008 12a11.066 11.066 0 003.086 2.5l1.207-1.207A1 1 0 0113 13h3a1 1 0 011 1v.5A2.5 2.5 0 0114.5 17 12.5 12.5 0 013 5.5z" transform="rotate(135 12 12)"/>
+        </svg>
+      </button>
+      <button id="btn-cam" class="ctrl-btn" aria-label="Turn off camera" aria-pressed="false">
+        <span class="muted-label">OFF</span>
+        <svg id="icon-cam-on" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+        </svg>
+        <svg id="icon-cam-off" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="display:none">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M15 10l4.553-2.276A1 1 0 0121 8.723v6.554M3 8a2 2 0 012-2h4M3 16a2 2 0 002 2h8a2 2 0 002-2v-1"/>
+        </svg>
+      </button>
+    </div>
+  </section>
+</div>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
+
