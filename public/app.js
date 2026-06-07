@@ -32,6 +32,7 @@ const remoteVideo = $('remote-video');
 const remotePlaceholder = $('remote-placeholder');
 const callRoomLabel = $('call-room-label');
 const connState = $('conn-state');
+const switchCameraBtn = $('switch-camera');
 const btnMic = $('btn-mic');
 const btnCam = $('btn-cam');
 const btnHangup = $('btn-hangup');
@@ -51,6 +52,7 @@ let pendingCandidates = [];
 
 let isMicMuted = false;
 let isCamOff = false;
+let currentFacingMode = 'user'; // front camera
 
 openDB().then(() => console.log('[DB] Ready'));
 
@@ -126,6 +128,36 @@ async function acquireLocalMedia() {
     }
 
     return false;
+  }
+}
+
+// ── CAMERA SWITCH ─────────────────────────────
+async function switchCamera() {
+  if (!localStream) return;
+
+  localStream.getTracks().forEach(track => track.stop());
+
+  currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+
+  try {
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: currentFacingMode },
+      audio: true
+    });
+
+    localStream = newStream;
+    localVideo.srcObject = localStream;
+
+    if (pc) {
+      const senders = pc.getSenders();
+      localStream.getTracks().forEach(track => {
+        const sender = senders.find(s => s.track.kind === track.kind);
+        if (sender) sender.replaceTrack(track);
+      });
+    }
+
+  } catch (err) {
+    console.error('Camera switch failed', err);
   }
 }
 
@@ -292,6 +324,9 @@ btnCam.onclick = () => {
 };
 
 btnHangup.onclick = hangUp;
+const switchCameraBtn = document.getElementById('switch-camera');
+switchCameraBtn.addEventListener('click', switchCamera);
+
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(console.warn);
