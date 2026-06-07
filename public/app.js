@@ -3,7 +3,7 @@
 import { openDB } from './db.js';
 
 // ── ICE / TURN config ─────────────────────────────
-const TURN_HOST = location.hostname;
+const TURN_HOST = adi-nexcall.up.railway.app;
 const TURN_USERNAME = 'adiconnect';
 const TURN_CREDENTIAL = 'adiconnect-pass';
 
