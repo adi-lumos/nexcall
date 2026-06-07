@@ -31,6 +31,7 @@ const localVideo = $('local-video');
 const remoteVideo = $('remote-video');
 const remotePlaceholder = $('remote-placeholder');
 const callRoomLabel = $('call-room-label');
+const connState = $('conn-state');
 const btnMic = $('btn-mic');
 const btnCam = $('btn-cam');
 const btnHangup = $('btn-hangup');
@@ -160,8 +161,26 @@ function createPC() {
   }
 
   pc.onicecandidate = e => {
-    if (e.candidate) signal('ice-candidate', e.candidate.toJSON());
+    if (e.candidate) {
+      const c = e.candidate.candidate;
+
+      if (c.includes("relay")) {
+        connState.textContent = "🔴 TURN (relay)";
+        connState.style.color = "#ff4d6d";
+      } 
+      else if (c.includes("srflx")) {
+        connState.textContent = "🟡 STUN (public NAT)";
+        connState.style.color = "#ffc832";
+      } 
+      else if (c.includes("host")) {
+        connState.textContent = "🟢 Direct (local)";
+        connState.style.color = "#00e5a0";
+      }
+
+      signal('ice-candidate', e.candidate.toJSON());
+    }
   };
+  
 
   pc.ontrack = e => {
     remoteVideo.srcObject = e.streams[0];
@@ -279,3 +298,15 @@ if ('serviceWorker' in navigator) {
 }
 
 console.log('[adiconnect] loaded');
+
+pc.onicecandidate = e => {
+  if (e.candidate) {
+    const c = e.candidate.candidate;
+
+    if (c.includes("relay")) console.log("🔥 TURN WORKING (relay)");
+    if (c.includes("srflx")) console.log("⚠️ STUN only");
+    if (c.includes("host")) console.log("⚠️ local only");
+
+    signal('ice-candidate', e.candidate.toJSON());
+  }
+};
