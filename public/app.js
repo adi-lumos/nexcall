@@ -1,9 +1,11 @@
+console.log("🔥 APP START");
 'use strict';
 
 import { openDB } from './db.js';
 
 // ── ICE / TURN config ─────────────────────────────
-const TURN_HOST = "adi-nexcall.up.railway.app";
+// const TURN_HOST = "adi-nexcall.up.railway.app";
+const TURN_HOST = "103.156.145.173";
 const TURN_USERNAME = 'adiconnect';
 const TURN_CREDENTIAL = 'adiconnect-pass';
 
@@ -148,8 +150,8 @@ async function switchCamera() {
     localStream = newStream;
     localVideo.srcObject = localStream;
 
-    if (pc) {
-      const senders = pc.getSenders();
+    if (peerConnection) {
+      const senders = peerConnection.getSenders();
       localStream.getTracks().forEach(track => {
         const sender = senders.find(s => s.track.kind === track.kind);
         if (sender) sender.replaceTrack(track);
@@ -193,24 +195,24 @@ function createPC() {
   }
 
   pc.onicecandidate = e => {
-    if (e.candidate) {
-      const c = e.candidate.candidate;
+    if (!e.candidate) return;
 
-      if (c.includes("relay")) {
-        connState.textContent = "🔴 TURN (relay)";
-        connState.style.color = "#ff4d6d";
-      } 
-      else if (c.includes("srflx")) {
-        connState.textContent = "🟡 STUN (public NAT)";
-        connState.style.color = "#ffc832";
-      } 
-      else if (c.includes("host")) {
-        connState.textContent = "🟢 Direct (local)";
-        connState.style.color = "#00e5a0";
-      }
+    const c = e.candidate.candidate;
 
-      signal('ice-candidate', e.candidate.toJSON());
+    if (c.includes("relay") && connState.textContent !== "🔴 TURN (relay)") {
+      connState.textContent = "🔴 TURN (relay)";
+      connState.style.color = "#ff4d6d";
+    } 
+    else if (c.includes("srflx") && connState.textContent !== "🟡 STUN (NAT)") {
+      connState.textContent = "🟡 STUN (NAT)";
+      connState.style.color = "#ffc832";
+    } 
+    else if (c.includes("host") && connState.textContent !== "🟢 Direct") {
+      connState.textContent = "🟢 Direct";
+      connState.style.color = "#00e5a0";
     }
+
+    signal('ice-candidate', e.candidate.toJSON());
   };
   
 
@@ -238,19 +240,35 @@ function resetCall() {
 
 async function startCall() {
   peerConnection = createPC();
+
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
+
   signal('offer', peerConnection.localDescription.toJSON());
+
+  // 🔥 ADD THIS (AFTER offer is created + sent)
+  pendingCandidates.forEach(c => {
+    peerConnection.addIceCandidate(c);
+  });
+  pendingCandidates = [];
 }
+
 
 async function handleOffer(sdp) {
   peerConnection = createPC();
+
   await peerConnection.setRemoteDescription(sdp);
 
   const answer = await peerConnection.createAnswer();
   await peerConnection.setLocalDescription(answer);
 
   signal('answer', peerConnection.localDescription.toJSON());
+
+  // 🔥 ADD THIS (AFTER answer is created + sent)
+  pendingCandidates.forEach(c => {
+    peerConnection.addIceCandidate(c);
+  });
+  pendingCandidates = [];
 }
 
 function hangUp() {
@@ -296,36 +314,56 @@ function handleSignal({ type, payload }) {
       break;
 
     case 'ice-candidate':
-      peerConnection
-        ? peerConnection.addIceCandidate(payload)
-        : pendingCandidates.push(payload);
+      if (peerConnection) {
+        peerConnection.addIceCandidate(payload);
+      } else {
+        pendingCandidates.push(payload);
+      }
       break;
   }
 }
 
 // ── EVENTS ─────────────────────────────
-btnCreate.onclick = () => {
-  const id = roomInput.value.trim() || generateRoomId();
-  roomInput.value = id;
-  joinRoom(id);
-};
+window.addEventListener("DOMContentLoaded", () => {
 
-btnJoin.onclick = () => joinRoom(roomInput.value.trim());
-btnRandom.onclick = () => joinRoom(generateRoomId());
+  console.log("🔥 EVENTS BINDING");
 
-btnMic.onclick = () => {
-  isMicMuted = !isMicMuted;
-  localStream?.getAudioTracks().forEach(t => t.enabled = !isMicMuted);
-};
+  const btnCreate = document.getElementById("btn-create");
+  const btnJoin = document.getElementById("btn-join");
+  const btnRandom = document.getElementById("btn-random");
+  const roomInput = document.getElementById("room-input");
 
-btnCam.onclick = () => {
-  isCamOff = !isCamOff;
-  localStream?.getVideoTracks().forEach(t => t.enabled = !isCamOff);
-};
+  btnCreate?.addEventListener("click", () => {
+    console.log("CREATE CLICKED");
+    const id = roomInput.value.trim() || generateRoomId();
+    roomInput.value = id;
+    joinRoom(id);
+  });
 
-btnHangup.onclick = hangUp;
-const switchCameraBtn = document.getElementById('switch-camera');
-switchCameraBtn.addEventListener('click', switchCamera);
+  btnJoin?.addEventListener("click", () => {
+    console.log("JOIN CLICKED");
+    joinRoom(roomInput.value.trim());
+  });
+
+  btnRandom?.addEventListener("click", () => {
+    console.log("RANDOM CLICKED");
+    joinRoom(generateRoomId());
+  });
+
+  btnMic?.addEventListener("click", () => {
+    isMicMuted = !isMicMuted;
+    localStream?.getAudioTracks().forEach(t => t.enabled = !isMicMuted);
+  });
+
+  btnCam?.addEventListener("click", () => {
+    isCamOff = !isCamOff;
+    localStream?.getVideoTracks().forEach(t => t.enabled = !isCamOff);
+  });
+
+  btnHangup?.addEventListener("click", hangUp);
+  switchCameraBtn?.addEventListener("click", switchCamera);
+
+});
 
 
 if ('serviceWorker' in navigator) {
@@ -333,15 +371,4 @@ if ('serviceWorker' in navigator) {
 }
 
 console.log('[adiconnect] loaded');
-
-pc.onicecandidate = e => {
-  if (e.candidate) {
-    const c = e.candidate.candidate;
-
-    if (c.includes("relay")) console.log("🔥 TURN WORKING (relay)");
-    if (c.includes("srflx")) console.log("⚠️ STUN only");
-    if (c.includes("host")) console.log("⚠️ local only");
-
-    signal('ice-candidate', e.candidate.toJSON());
-  }
-};
+console.log("🔥 APP END");
