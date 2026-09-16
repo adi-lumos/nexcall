@@ -221,6 +221,18 @@ function createPC() {
     remotePlaceholder.style.display = 'none';
   };
 
+  pc.oniceconnectionstatechange = () => {
+    console.log('[WebRTC] ICE connection state:', pc.iceConnectionState);
+  };
+
+  pc.onconnectionstatechange = () => {
+    console.log('[WebRTC] connection state:', pc.connectionState);
+  };
+
+  pc.onsignalingstatechange = () => {
+    console.log('[WebRTC] signaling state:', pc.signalingState);
+  };
+
   return pc;
 }
 
@@ -239,36 +251,42 @@ function resetCall() {
 }
 
 async function startCall() {
-  peerConnection = createPC();
+  try {
+    peerConnection = createPC();
 
-  const offer = await peerConnection.createOffer();
-  await peerConnection.setLocalDescription(offer);
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
 
-  signal('offer', peerConnection.localDescription.toJSON());
-
-  // 🔥 ADD THIS (AFTER offer is created + sent)
-  pendingCandidates.forEach(c => {
-    peerConnection.addIceCandidate(c);
-  });
-  pendingCandidates = [];
+    signal('offer', peerConnection.localDescription.toJSON());
+  } catch (err) {
+    console.error('[WebRTC] startCall failed:', err);
+  }
 }
 
 
 async function handleOffer(sdp) {
-  peerConnection = createPC();
+  try {
+    peerConnection = createPC();
 
-  await peerConnection.setRemoteDescription(sdp);
+    await peerConnection.setRemoteDescription(sdp);
 
-  const answer = await peerConnection.createAnswer();
-  await peerConnection.setLocalDescription(answer);
+    for (const candidate of pendingCandidates) {
+      try {
+        await peerConnection.addIceCandidate(candidate);
+      } catch (err) {
+        console.error('[WebRTC] Failed to add queued ICE candidate:', err);
+      }
+    }
 
-  signal('answer', peerConnection.localDescription.toJSON());
+    pendingCandidates = [];
 
-  // 🔥 ADD THIS (AFTER answer is created + sent)
-  pendingCandidates.forEach(c => {
-    peerConnection.addIceCandidate(c);
-  });
-  pendingCandidates = [];
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+
+    signal('answer', peerConnection.localDescription.toJSON());
+  } catch (err) {
+    console.error('[WebRTC] handleOffer failed:', err);
+  }
 }
 
 function hangUp() {
@@ -310,15 +328,35 @@ function handleSignal({ type, payload }) {
       break;
 
     case 'answer':
-      peerConnection?.setRemoteDescription(payload);
+      if (!peerConnection) break;
+
+      peerConnection.setRemoteDescription(payload)
+        .then(async () => {
+          for (const candidate of pendingCandidates) {
+            try {
+              await peerConnection.addIceCandidate(candidate);
+            } catch (err) {
+              console.error('[WebRTC] Failed to add queued ICE candidate:', err);
+            }
+          }
+
+          pendingCandidates = [];
+        })
+        .catch(err => {
+          console.error('[WebRTC] Failed to set remote answer:', err);
+        });
       break;
 
     case 'ice-candidate':
-      if (peerConnection) {
-        peerConnection.addIceCandidate(payload);
-      } else {
+      if (!peerConnection || !peerConnection.remoteDescription) {
         pendingCandidates.push(payload);
+        break;
       }
+
+      peerConnection.addIceCandidate(payload)
+        .catch(err => {
+          console.error('[WebRTC] Failed to add ICE candidate:', err);
+        });
       break;
   }
 }
